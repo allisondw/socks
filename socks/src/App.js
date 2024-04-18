@@ -1,3 +1,15 @@
+// create sprite sheet for Byte
+// create sprite sheet for socks
+// create background
+// fix byte's AI movement
+// finetune sock-catching
+// add "click to start" to begin socks falling
+// add sound effects
+// add how to win
+// add 'idle' to keyup?
+// deploy
+// 
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import "./App.css";
 
@@ -37,8 +49,6 @@ const App = () => {
     canvas.width = 800;
     canvas.height = 600;
 
-    const SPRITE_WIDTH = 32; 
-    const SPRITE_HEIGHT = 28;
     const FRAMES_PER_STATE = 2;
     const FRAME_TIME = 150;
     let lastFrameTime = Date.now();
@@ -59,31 +69,40 @@ const App = () => {
 
     const moveElon = () => {
       const elonObj = elon.current;
+      let moved = false;
+
       if (keysPressed['ArrowRight']) {
-        elonObj.x = Math.min(elonObj.x + elonObj.speed, canvas.width - SPRITE_WIDTH);
+        elonObj.x = Math.min(elonObj.x + elonObj.speed, canvas.width - elonObj.width);
         elonObj.state = 'walkingRight';
+        moved = true;
       }
       if (keysPressed['ArrowLeft']) {
         elonObj.x = Math.max(elonObj.x - elonObj.speed, 0);
         elonObj.state = 'walkingLeft';
+        moved = true;
       }
       if (keysPressed['ArrowUp']) {
         elonObj.y = Math.max(elonObj.y -= elonObj.speed, 200);
         elonObj.state = 'walkingUp';
+        moved = true;
       }
       if (keysPressed['ArrowDown']) {
-        elonObj.y = Math.min(elonObj.y += elonObj.speed, canvas.height - SPRITE_HEIGHT);
+        elonObj.y = Math.min(elonObj.y += elonObj.speed, canvas.height - elonObj.height);
         elonObj.state = 'walkingDown';
+        moved = true;
+      }
+      if (!moved) {
+        elonObj.state = 'idle';
       }
     };
 
     const addNewSock = () => {
       socksRef.current.push({
-        x: Math.random() * (canvas.width - 20),
+        x: Math.random() * (canvas.width - 50),
         y: 0,
         height: 10,
         width: 20,
-        speed: Math.random() * 3 + 2
+        speed: Math.random() * 2 + 2
       });
     };
 
@@ -102,11 +121,20 @@ const App = () => {
       }
     }
 
+    const COLLISION_BUFFER = 10;
+    const VERTICAL_BUFFER = 20;
+
     const checkCollision = (sock, character) => {
-      return character.x < sock.x + 20 &&
-             character.x + character.width > sock.x &&
-             character.y < sock.y &&
-             character.y + character.height > sock.y;
+      if (!character || !sock) {
+        console.warn("Character or sock is undefined", character, sock);
+        return false;
+      }
+      return (
+        character.x - COLLISION_BUFFER < sock.x + sock.width &&
+        character.x + character.width + COLLISION_BUFFER > sock.x &&
+        character.y - VERTICAL_BUFFER < sock.y + sock.height &&
+        character.y + character.height + VERTICAL_BUFFER >= sock.y
+      )
     };
 
     const moveSocks = () => {
@@ -140,7 +168,7 @@ const App = () => {
         const frameX = elonObj.currentFrame * elonObj.width;
         const frameY = STATES[elonObj.state] * elonObj.height;
 
-        const SCALE = 3;
+        const SCALE = 4;
       
         context.drawImage(
           elonSprite,
@@ -148,8 +176,8 @@ const App = () => {
           frameY,
           elonObj.width,
           elonObj.height,
-          elonObj.x,
-          elonObj.y,
+          elonObj.x - (elonObj.width * SCALE / 2),
+          elonObj.y - (elonObj.height * SCALE / 2),
           elonObj.width * SCALE,
           elonObj.height * SCALE
         );
@@ -179,6 +207,7 @@ const App = () => {
       moveByte();
       drawElon();
       drawElements();
+      checkCollision();
       updateFrame();
       requestRef.current = requestAnimationFrame(updateGame);
     };
