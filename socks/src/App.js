@@ -1,14 +1,14 @@
 // create sprite sheet for Byte
 // create sprite sheet for socks
 // create background
-// fix byte's AI movement
+// fix byte's AI movement, keep onscreen, needs to be able to catch a sock too
 // finetune sock-catching
 // add "click to start" to begin socks falling
 // add sound effects
 // add how to win
 // add 'idle' to keyup?
 // deploy
-// 
+// chunk out what I can from App.js into separate files for readability
 
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import "./App.css";
@@ -72,12 +72,12 @@ const App = () => {
       let moved = false;
 
       if (keysPressed['ArrowRight']) {
-        elonObj.x = Math.min(elonObj.x + elonObj.speed, canvas.width - elonObj.width);
+        elonObj.x = Math.min(elonObj.x + elonObj.speed, canvas.width - 100);
         elonObj.state = 'walkingRight';
         moved = true;
       }
       if (keysPressed['ArrowLeft']) {
-        elonObj.x = Math.max(elonObj.x - elonObj.speed, 0);
+        elonObj.x = Math.max(elonObj.x - elonObj.speed, 100);
         elonObj.state = 'walkingLeft';
         moved = true;
       }
@@ -97,8 +97,10 @@ const App = () => {
     };
 
     const addNewSock = () => {
+      const startX = 100;
+      const activeWidth = 600;
       socksRef.current.push({
-        x: Math.random() * (canvas.width - 50),
+        x: startX + Math.random() * activeWidth,
         y: 0,
         height: 10,
         width: 20,
@@ -181,6 +183,11 @@ const App = () => {
           elonObj.width * SCALE,
           elonObj.height * SCALE
         );
+
+        context.imageSmoothingEnabled = false; 
+        context.mozImageSmoothingEnabled = false;
+        context.webkitImageSmoothingEnabled = false;
+        context.msImageSmoothingEnabled = false;
       }
     };
     
@@ -224,7 +231,7 @@ const App = () => {
   }, [elonSpriteLoaded, elonSprite]);
 
   return (
-    <div className='app'>
+    <div className='app pixelart'>
       <canvas ref={canvasRef} width={800} height={600} className='game-canvas'/>
     </div>
   );
