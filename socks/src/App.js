@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import "./App.css";
 
 const App = () => {
@@ -6,6 +6,30 @@ const App = () => {
   const socksRef = useRef([]);
   const scoreRef = useRef(0);
   const requestRef = useRef();
+  const [elonSpriteLoaded, setElonSpriteLoaded] = useState(false);
+
+  const elonSprite = useMemo(() => {
+    const img = new Image();
+    img.onload = () => {
+      console.log('Sprite has loaded');
+      setElonSpriteLoaded(true);
+    };
+    img.onerror = () => {
+      console.error('Failed to load sprite image');
+    };  
+    img.src = '/sprites/Elon_spritesheet.png';
+    return img;
+  }, []); 
+
+  const elon = useRef({
+    x: 375, 
+    y: 500, 
+    speed: 5,
+    width: 32,
+    height: 32, 
+    state: 'idle',
+    currentFrame: 0
+  });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -13,18 +37,44 @@ const App = () => {
     canvas.width = 800;
     canvas.height = 600;
 
-    let elon = { x: 375, y: 500, speed: 5 };
-    let byte = { x: 325, y: 520, speed: 4 };
+    const SPRITE_WIDTH = 32; 
+    const SPRITE_HEIGHT = 28;
+    const FRAMES_PER_STATE = 2;
+    const FRAME_TIME = 150;
+    let lastFrameTime = Date.now();
+
+    const updateFrame = () => {
+      const now = Date.now();
+      if (now - lastFrameTime > FRAME_TIME) {
+        elon.current.currentFrame = (elon.current.currentFrame + 1) % FRAMES_PER_STATE;
+        lastFrameTime = now;
+      }
+    };
+
+    let byte = { x: 325, y: 520, speed: 2 };
     let keysPressed = {};
 
     document.addEventListener('keydown', (event) => keysPressed[event.key] = true);
     document.addEventListener('keyup', (event) => keysPressed[event.key] = false);
 
     const moveElon = () => {
-      if (keysPressed['ArrowRight']) elon.x = Math.min(elon.x + elon.speed, canvas.width - 50);
-      if (keysPressed['ArrowLeft']) elon.x = Math.max(elon.x - elon.speed, 0);
-      if (keysPressed['ArrowUp']) elon.y = Math.max(elon.y -= elon.speed, 200);
-      if (keysPressed['ArrowDown']) elon.y = Math.min(elon.y += elon.speed, canvas.height - 50);
+      const elonObj = elon.current;
+      if (keysPressed['ArrowRight']) {
+        elonObj.x = Math.min(elonObj.x + elonObj.speed, canvas.width - SPRITE_WIDTH);
+        elonObj.state = 'walkingRight';
+      }
+      if (keysPressed['ArrowLeft']) {
+        elonObj.x = Math.max(elonObj.x - elonObj.speed, 0);
+        elonObj.state = 'walkingLeft';
+      }
+      if (keysPressed['ArrowUp']) {
+        elonObj.y = Math.max(elonObj.y -= elonObj.speed, 200);
+        elonObj.state = 'walkingUp';
+      }
+      if (keysPressed['ArrowDown']) {
+        elonObj.y = Math.min(elonObj.y += elonObj.speed, canvas.height - SPRITE_HEIGHT);
+        elonObj.state = 'walkingDown';
+      }
     };
 
     const addNewSock = () => {
@@ -37,28 +87,78 @@ const App = () => {
       });
     };
 
-    const checkCollision = (sock) => {
-      return elon.x < sock.x + 20 && 
-             elon.x + 50 > sock.x && 
-             elon.y < sock.y + 10 && 
-             elon.y + 50 > sock.y;   
-  };
+    const moveByte = () => {
+      if (socksRef.current.length > 0) {
+        const closestSock = socksRef.current.reduce((closest, sock) => {
+          return Math.abs(sock.x - byte.x) < Math.abs(closest.x - byte.x) ? sock : closest;
+        }, socksRef.current[0]);
+        if (closestSock.x < byte.x) {
+          byte.x -= byte.speed;
+          byte.y -= byte.speed;
+        } else if (closestSock.x > byte.x) {
+          byte.x += byte.speed;
+          byte.y += byte.speed;
+        }
+      }
+    }
+
+    const checkCollision = (sock, character) => {
+      return character.x < sock.x + 20 &&
+             character.x + character.width > sock.x &&
+             character.y < sock.y &&
+             character.y + character.height > sock.y;
+    };
 
     const moveSocks = () => {
+      let elonObj = elon.current;
       socksRef.current = socksRef.current.map(sock => {
-        if (checkCollision(sock)) {
+        if (checkCollision(sock, elonObj)) {
           scoreRef.current += 1;
+          console.log('Elon caught a sock');
+          return null;
+        } else if (checkCollision(sock, byte)) {
+          scoreRef.current -= 1;
+          console.log('Byte caught a sock');
           return null;
         }
         return { ...sock, y: sock.y + sock.speed };
       }).filter(sock => sock !== null && sock.y <= canvas.height);
     };
+
+    const STATES = {
+      idle: 0,
+      walkingRight: 1,
+      walkingLeft: 2,
+      walkingDown: 3,
+      walkingUp: 4
+    };
+
+    const drawElon = () => {
+      console.log('drawElon called', elonSpriteLoaded);
+      if(elonSpriteLoaded) {
+        const elonObj = elon.current;
+        const frameX = elonObj.currentFrame * elonObj.width;
+        const frameY = STATES[elonObj.state] * elonObj.height;
+
+        const SCALE = 3;
+      
+        context.drawImage(
+          elonSprite,
+          frameX,
+          frameY,
+          elonObj.width,
+          elonObj.height,
+          elonObj.x,
+          elonObj.y,
+          elonObj.width * SCALE,
+          elonObj.height * SCALE
+        );
+      }
+    };
     
     const drawElements = () => {
       context.clearRect(0, 0, canvas.width, canvas.height);
-      // Draw Elon
-      context.fillStyle = 'blue';
-      context.fillRect(elon.x, elon.y, 50, 50);
+      drawElon();
       // Draw Byte
       context.fillStyle = 'red';
       context.fillRect(byte.x, byte.y, 30, 30);
@@ -76,7 +176,10 @@ const App = () => {
     const updateGame = () => {
       moveElon();
       moveSocks();
+      moveByte();
+      drawElon();
       drawElements();
+      updateFrame();
       requestRef.current = requestAnimationFrame(updateGame);
     };
 
@@ -89,7 +192,7 @@ const App = () => {
       document.removeEventListener('keydown', (event) => keysPressed[event.key] = true);
       document.removeEventListener('keyup', (event) => keysPressed[event.key] = false);
     };
-  }, []);
+  }, [elonSpriteLoaded, elonSprite]);
 
   return (
     <div className='app'>
