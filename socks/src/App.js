@@ -16,9 +16,11 @@ const App = () => {
   const requestRef = useRef();
   const [elonSpriteLoaded, setElonSpriteLoaded] = useState(false);
   const [byteSpriteLoaded, setByteSpriteLoaded] = useState(false);
+  const [sockSpriteLoaded, setSockSpriteLoaded] = useState(false);
   const [byteIdleSince, setByteIdleSince] = useState(null);
   const [byteIsSpinning, setByteIsSpinning] = useState(false);
-
+  const [gameIsRunning, setGameIsRunning] = useState(false);
+  const keysPressed = useRef({});
 
   const elonSprite = useMemo(() => {
     const img = new Image();
@@ -58,7 +60,7 @@ const App = () => {
 
   const byte = useRef({
     x: 400, 
-    y: 550, 
+    y: 500, 
     speed: 3.5,
     width: 12,
     height: 12, 
@@ -66,7 +68,41 @@ const App = () => {
     currentFrame: 0
   });
 
+  const sockSprite = useMemo(() => {
+    const img = new Image();
+    img.onload = () => {
+      console.log('Sock sprite has loaded');
+      setSockSpriteLoaded(true);
+    };
+    img.onerror = () => {
+      console.error('Failed to load sock sprite image');
+    };
+    img.src = '/sprites/socks-sprite.png';
+    return img;
+  }, []);
+  
+
+
   useEffect(() => {
+    const handleKeyDown = (event) => {
+      keysPressed.current[event.key] = true;
+    };
+
+    const handleKeyUp = (event) => {
+      keysPressed.current[event.key] = false;
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    if(!gameIsRunning) return;
 
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
@@ -91,31 +127,26 @@ const App = () => {
       updateCharacterFrame(byte.current);
     };
 
-    let keysPressed = {};
-
-    document.addEventListener('keydown', (event) => keysPressed[event.key] = true);
-    document.addEventListener('keyup', (event) => keysPressed[event.key] = false);
-
     const moveElon = () => {
       const elonObj = elon.current;
       let moved = false;
 
-      if (keysPressed['ArrowRight']) {
+      if (keysPressed.current['ArrowRight']) {
         elonObj.x = Math.min(elonObj.x + elonObj.speed, canvas.width - 100);
         elonObj.state = 'walkingRight';
         moved = true;
       }
-      if (keysPressed['ArrowLeft']) {
+      if (keysPressed.current['ArrowLeft']) {
         elonObj.x = Math.max(elonObj.x - elonObj.speed, 100);
         elonObj.state = 'walkingLeft';
         moved = true;
       }
-      if (keysPressed['ArrowUp']) {
+      if (keysPressed.current['ArrowUp']) {
         elonObj.y = Math.max(elonObj.y -= elonObj.speed, 200);
         elonObj.state = 'walkingUp';
         moved = true;
       }
-      if (keysPressed['ArrowDown']) {
+      if (keysPressed.current['ArrowDown']) {
         elonObj.y = Math.min(elonObj.y += elonObj.speed, canvas.height - elonObj.height);
         elonObj.state = 'walkingDown';
         moved = true;
@@ -131,9 +162,9 @@ const App = () => {
       socksRef.current.push({
         x: startX + Math.random() * activeWidth,
         y: 0,
-        height: 10,
+        height: 20,
         width: 20,
-        speed: Math.random() * 3 + 2
+        speed: Math.random() * 2 + 2
       });
     };
 
@@ -178,11 +209,15 @@ const App = () => {
 
     const COLLISION_BUFFER = 10;
     const VERTICAL_BUFFER = 20;
+    const PROXIMITY_LIMIT = 50;
 
     const checkCollision = (sock, character) => {
       if (!character || !sock) {
         console.warn("Character or sock is undefined", character, sock);
         return false;
+      }
+      if (Math.abs(sock.x - character.x) > PROXIMITY_LIMIT || Math.abs(sock.y - character.y) > PROXIMITY_LIMIT) {
+        return false; 
       }
       return (
         character.x - COLLISION_BUFFER < sock.x + sock.width &&
@@ -196,6 +231,7 @@ const App = () => {
       let elonObj = elon.current;
       let byteObj = byte.current;
       socksRef.current = socksRef.current.map(sock => {
+        sock.y += sock.speed;
         if (checkCollision(sock, elonObj)) {
           scoreRef.current += 1;
           console.log('Elon caught a sock');
@@ -208,6 +244,12 @@ const App = () => {
         return { ...sock, y: sock.y + sock.speed };
       }).filter(sock => sock !== null && sock.y <= canvas.height);
     };
+
+    const sockInterval = setInterval(() => {
+      if (socksRef.current.length < 20) { 
+        addNewSock();
+      }
+    }, 500);
 
     const ELON_STATES = {
       idle: 0,
@@ -287,19 +329,32 @@ const App = () => {
         context.msImageSmoothingEnabled = false;
       }
     }
+
+    const drawSocks = () => {
+      socksRef.current.forEach(sock => {
+        if (sockSpriteLoaded) {
+          const SCALE = 3; 
+          context.drawImage(
+            sockSprite,
+            sock.x - (sock.width * SCALE / 2),
+            sock.y - (sock.height * SCALE / 2),
+            sock.width * SCALE,
+            sock.height * SCALE
+          );
+        }
+      });
+    };
+    
     
     const drawElements = () => {
       context.clearRect(0, 0, canvas.width, canvas.height);
       drawElon();
       drawByte();
-      socksRef.current.forEach(sock => {
-        context.fillStyle = 'grey';
-        context.fillRect(sock.x, sock.y, 20, 10);
-      });
+      drawSocks();
 
-      context.font = '12px Arial';
-      context.fillStyle = 'black';
-      context.fillText(`Score: ${scoreRef.current}`, 10, 20);
+      context.font = '22px Futura';
+      context.fillStyle = 'blue';
+      context.fillText(`Score: ${scoreRef.current}`, 25, 45);
     };
 
     const updateGame = () => {
@@ -311,22 +366,27 @@ const App = () => {
       drawElements();
       checkCollision();
       updateFrame();
-      requestRef.current = requestAnimationFrame(updateGame);
+      if(gameIsRunning) {
+        requestRef.current = requestAnimationFrame(updateGame);
+      }
     };
 
     updateGame();
-    const sockInterval = setInterval(addNewSock, 500);
+  
 
     return () => {
       clearInterval(sockInterval);
       cancelAnimationFrame(requestRef.current);
-      document.removeEventListener('keydown', (event) => keysPressed[event.key] = true);
-      document.removeEventListener('keyup', (event) => keysPressed[event.key] = false);
     };
-  }, [elonSpriteLoaded, elonSprite, byteSpriteLoaded, byteSprite, byteIdleSince, byteIsSpinning]);
+  }, [gameIsRunning, elonSpriteLoaded, elonSprite, byteSpriteLoaded, byteSprite, sockSpriteLoaded, sockSprite, byteIdleSince, byteIsSpinning]);
 
   return (
     <div className='app pixelart'>
+      {!gameIsRunning && (
+        <div className='start-overlay'>
+          <button onClick={() => setGameIsRunning(true)}>Start</button>
+        </div>
+      )}
       <canvas ref={canvasRef} width={800} height={600} className='game-canvas'/>
     </div>
   );
