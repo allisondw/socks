@@ -1,12 +1,8 @@
-// create sprite sheet for Byte
 // create sprite sheet for socks
 // create background
-// fix byte's AI movement, keep onscreen, needs to be able to catch a sock too
-// finetune sock-catching
 // add "click to start" to begin socks falling
 // add sound effects
 // add how to win
-// add 'idle' to keyup?
 // deploy
 // chunk out what I can from App.js into separate files for readability
 
@@ -19,23 +15,27 @@ const App = () => {
   const scoreRef = useRef(0);
   const requestRef = useRef();
   const [elonSpriteLoaded, setElonSpriteLoaded] = useState(false);
+  const [byteSpriteLoaded, setByteSpriteLoaded] = useState(false);
+  const [byteIdleSince, setByteIdleSince] = useState(null);
+  const [byteIsSpinning, setByteIsSpinning] = useState(false);
+
 
   const elonSprite = useMemo(() => {
     const img = new Image();
     img.onload = () => {
-      console.log('Sprite has loaded');
+      console.log('Elon sprite has loaded');
       setElonSpriteLoaded(true);
     };
     img.onerror = () => {
-      console.error('Failed to load sprite image');
+      console.error('Failed to load Elon sprite image');
     };  
-    img.src = '/sprites/Elon_spritesheet.png';
+    img.src = '/sprites/elon_spritesheet.png';
     return img;
   }, []); 
 
   const elon = useRef({
     x: 375, 
-    y: 500, 
+    y: 450, 
     speed: 5,
     width: 32,
     height: 32, 
@@ -43,25 +43,54 @@ const App = () => {
     currentFrame: 0
   });
 
+  const byteSprite = useMemo(() => {
+    const img = new Image();
+    img.onload = () => {
+      console.log('Byte sprite has loaded');
+      setByteSpriteLoaded(true);
+    };
+    img.onerror = () => {
+      console.error('Failed to load Byte sprite image');
+    };  
+    img.src = '/sprites/byte_spritesheet2.png';
+    return img;
+  }, []); 
+
+  const byte = useRef({
+    x: 400, 
+    y: 550, 
+    speed: 3.5,
+    width: 12,
+    height: 12, 
+    state: 'idle',
+    currentFrame: 0
+  });
+
   useEffect(() => {
+
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
     canvas.width = 800;
     canvas.height = 600;
 
+    elon.current.lastFrameTime = Date.now();
+    byte.current.lastFrameTime = Date.now();
     const FRAMES_PER_STATE = 2;
     const FRAME_TIME = 150;
-    let lastFrameTime = Date.now();
 
     const updateFrame = () => {
       const now = Date.now();
-      if (now - lastFrameTime > FRAME_TIME) {
-        elon.current.currentFrame = (elon.current.currentFrame + 1) % FRAMES_PER_STATE;
-        lastFrameTime = now;
-      }
+      const updateCharacterFrame = (character) => {
+        if (now - character.lastFrameTime > FRAME_TIME) {
+          character.currentFrame = (character.currentFrame + 1) % FRAMES_PER_STATE;
+          character.lastFrameTime = now;
+        }
+      };
+
+      updateCharacterFrame(elon.current);
+      updateCharacterFrame(byte.current);
     };
 
-    let byte = { x: 325, y: 520, speed: 2 };
     let keysPressed = {};
 
     document.addEventListener('keydown', (event) => keysPressed[event.key] = true);
@@ -104,21 +133,45 @@ const App = () => {
         y: 0,
         height: 10,
         width: 20,
-        speed: Math.random() * 2 + 2
+        speed: Math.random() * 3 + 2
       });
     };
 
     const moveByte = () => {
+      let byteObj = byte.current;
       if (socksRef.current.length > 0) {
         const closestSock = socksRef.current.reduce((closest, sock) => {
-          return Math.abs(sock.x - byte.x) < Math.abs(closest.x - byte.x) ? sock : closest;
+          return Math.abs(sock.x - byteObj.x) < Math.abs(closest.x - byteObj.x) ? sock : closest;
         }, socksRef.current[0]);
-        if (closestSock.x < byte.x) {
-          byte.x -= byte.speed;
-          byte.y -= byte.speed;
-        } else if (closestSock.x > byte.x) {
-          byte.x += byte.speed;
-          byte.y += byte.speed;
+         
+        const tolerance = 5;
+        const now = Date.now();
+
+        if (Math.abs(closestSock.x - byteObj.x) <= tolerance) {
+          if (byteObj.state !== 'idle') {
+            byteObj.state = 'idle';
+            setByteIdleSince(now);
+            if (byte.current.timeoutId) {
+              clearTimeout(byte.current.timeoutId);
+            }
+            byte.current.timeoutId = setTimeout(() => {
+              if (now - byteIdleSince >= 2000) { 
+                setByteIsSpinning(true);
+                setTimeout(() => setByteIsSpinning(false), 300);
+              }
+            }, 2000);
+          }
+        } else {
+          setByteIdleSince(null);
+          setByteIsSpinning(false);
+          if (closestSock.x < byteObj.x) {
+            byteObj.x -= byteObj.speed;
+            byteObj.state = 'walkingLeft';
+          } 
+          if (closestSock.x > byteObj.x) {
+            byteObj.x += byteObj.speed;
+            byteObj.state = 'walkingRight';
+          }
         }
       }
     }
@@ -141,12 +194,13 @@ const App = () => {
 
     const moveSocks = () => {
       let elonObj = elon.current;
+      let byteObj = byte.current;
       socksRef.current = socksRef.current.map(sock => {
         if (checkCollision(sock, elonObj)) {
           scoreRef.current += 1;
           console.log('Elon caught a sock');
           return null;
-        } else if (checkCollision(sock, byte)) {
+        } else if (checkCollision(sock, byteObj)) {
           scoreRef.current -= 1;
           console.log('Byte caught a sock');
           return null;
@@ -155,7 +209,7 @@ const App = () => {
       }).filter(sock => sock !== null && sock.y <= canvas.height);
     };
 
-    const STATES = {
+    const ELON_STATES = {
       idle: 0,
       walkingRight: 1,
       walkingLeft: 2,
@@ -168,7 +222,7 @@ const App = () => {
       if(elonSpriteLoaded) {
         const elonObj = elon.current;
         const frameX = elonObj.currentFrame * elonObj.width;
-        const frameY = STATES[elonObj.state] * elonObj.height;
+        const frameY = ELON_STATES[elonObj.state] * elonObj.height;
 
         const SCALE = 4;
       
@@ -190,14 +244,54 @@ const App = () => {
         context.msImageSmoothingEnabled = false;
       }
     };
+
+    const BYTE_STATES = {
+      idle: 0,
+      walkingLeft: 1,
+      walkingRight: 2,
+      spin: 3
+    };
+
+    const drawByte = () => {
+      console.log('drawByte called', byteSpriteLoaded);
+      if(byteSpriteLoaded) {
+        const byteObj = byte.current;
+        let frameX, frameY;
+
+        if (byteIsSpinning) {
+          byteObj.currentFrame = (byteObj.currentFrame + 1) % FRAMES_PER_STATE;
+          frameX = byteObj.currentFrame * byteObj.width;
+          frameY = BYTE_STATES.spin * byteObj.height;
+        } else {
+          frameX = byteObj.currentFrame * byteObj.width;
+          frameY = BYTE_STATES[byteObj.state] * byteObj.height;
+        }
+ 
+        const SCALE = 4;
+
+        context.drawImage(
+          byteSprite,
+          frameX, 
+          frameY, 
+          byteObj.width,
+          byteObj.height,
+          byteObj.x - (byteObj.width * SCALE / 2),
+          byteObj.y - (byteObj.height * SCALE / 2),
+          byteObj.width * SCALE,
+          byteObj.height * SCALE
+        );
+
+        context.imageSmoothingEnabled = false; 
+        context.mozImageSmoothingEnabled = false;
+        context.webkitImageSmoothingEnabled = false;
+        context.msImageSmoothingEnabled = false;
+      }
+    }
     
     const drawElements = () => {
       context.clearRect(0, 0, canvas.width, canvas.height);
       drawElon();
-      // Draw Byte
-      context.fillStyle = 'red';
-      context.fillRect(byte.x, byte.y, 30, 30);
-      // Draw Socks
+      drawByte();
       socksRef.current.forEach(sock => {
         context.fillStyle = 'grey';
         context.fillRect(sock.x, sock.y, 20, 10);
@@ -213,6 +307,7 @@ const App = () => {
       moveSocks();
       moveByte();
       drawElon();
+      drawByte();
       drawElements();
       checkCollision();
       updateFrame();
@@ -220,7 +315,7 @@ const App = () => {
     };
 
     updateGame();
-    const sockInterval = setInterval(addNewSock, 1500);
+    const sockInterval = setInterval(addNewSock, 500);
 
     return () => {
       clearInterval(sockInterval);
@@ -228,7 +323,7 @@ const App = () => {
       document.removeEventListener('keydown', (event) => keysPressed[event.key] = true);
       document.removeEventListener('keyup', (event) => keysPressed[event.key] = false);
     };
-  }, [elonSpriteLoaded, elonSprite]);
+  }, [elonSpriteLoaded, elonSprite, byteSpriteLoaded, byteSprite, byteIdleSince, byteIsSpinning]);
 
   return (
     <div className='app pixelart'>
