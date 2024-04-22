@@ -15,7 +15,9 @@
   height: 100vh;
 }
 
-.start-overlay {
+.start-overlay,
+.win-overlay,
+.lose-overlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -25,10 +27,16 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  display: flex;
+  flex-direction: column;
+  color: white;
 }
 
-.start-overlay button {
+.start-overlay button,
+.win-overlay button,
+.lose-overlay button {
   padding: 10px 20px;
   font-size: 24px;
   cursor: pointer;
+  border-radius: 5px;
 }
