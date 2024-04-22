@@ -1,8 +1,4 @@
-// create sprite sheet for socks
-// create background
-// add "click to start" to begin socks falling
 // add sound effects
-// add how to win
 // deploy
 // chunk out what I can from App.js into separate files for readability
 
@@ -32,7 +28,7 @@ const App = () => {
     img.onerror = () => {
       console.error('Failed to load Elon sprite image');
     };  
-    img.src = '/sprites/elon_spritesheet.png';
+    img.src = process.env.PUBLIC_URL + '/sprites/elon_spritesheet.png';
     return img;
   }, []); 
 
@@ -55,7 +51,7 @@ const App = () => {
     img.onerror = () => {
       console.error('Failed to load Byte sprite image');
     };  
-    img.src = '/sprites/byte_spritesheet2.png';
+    img.src = process.env.PUBLIC_URL + '/sprites/byte_spritesheet2.png';
     return img;
   }, []); 
 
@@ -78,7 +74,7 @@ const App = () => {
     img.onerror = () => {
       console.error('Failed to load sock sprite image');
     };
-    img.src = '/sprites/socks-sprite.png';
+    img.src = process.env.PUBLIC_URL + '/sprites/socks-sprite.png';
     return img;
   }, []);
   
@@ -402,13 +398,13 @@ const App = () => {
       {gameResult === 'win' && (
         <div className='win-overlay'> 
           <h1>You Win!</h1>
-          <button onClick={() => setGameIsRunning(true)}>Play Again</button>
+          <button onClick={() => setGameIsRunning(true)}>⌘R to Play Again</button>
         </div>
       )}
       {gameResult === 'lose' && (
         <div className='lose-overlay'>
           <h1>You Lose!</h1>
-          <button onClick={() => setGameIsRunning(true)}>Play Again</button>
+          <button onClick={() => setGameIsRunning(true)}>⌘R to Play Again</button>
         </div>
       )}
       <canvas ref={canvasRef} width={800} height={600} className='game-canvas'/>
