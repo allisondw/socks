@@ -398,13 +398,13 @@ const App = () => {
       {gameResult === 'win' && (
         <div className='win-overlay'> 
           <h1>You Win!</h1>
-          <button onClick={() => setGameIsRunning(true)}>⌘R to Play Again</button>
+          <button onClick={() => setGameIsRunning(true)}>Refresh the Page to Play Again</button>
         </div>
       )}
       {gameResult === 'lose' && (
         <div className='lose-overlay'>
           <h1>You Lose!</h1>
-          <button onClick={() => setGameIsRunning(true)}>⌘R to Play Again</button>
+          <button onClick={() => setGameIsRunning(true)}>Refresh the Page to Play Again</button>
         </div>
       )}
       <canvas ref={canvasRef} width={800} height={600} className='game-canvas'/>
